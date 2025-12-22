@@ -8,7 +8,7 @@ const trackTitle = document.getElementById("trackTitle");
 const trackMeta = document.getElementById("trackMeta");
 
 const playPauseBtn = document.getElementById("playPauseBtn");
-const playIcon = document.getElementById("playIcon");
+const playPauseIcon = document.getElementById("playPauseIcon");
 const nextBtn = document.getElementById("nextBtn");
 const prevBtn = document.getElementById("prevBtn");
 const volumeSlider = document.getElementById("volumeSlider");
@@ -35,9 +35,7 @@ async function updateNowPlaying() {
     bg.style.backgroundImage = `url(${artUrl})`;
 
     isPlaying = data.is_playing;
-    playIcon.innerHTML = isPlaying
-      ? `<path fill="currentColor" d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>`
-      : `<path fill="currentColor" d="M8 5v14l11-7z"/>`;
+    playPauseIcon.className = isPlaying ? "icon-pause" : "icon-play";
 
   } catch (err) {
     console.error("Error updating now playing:", err);
@@ -48,9 +46,7 @@ async function updateNowPlaying() {
 playPauseBtn.onclick = () => {
   fetch(`${BACKEND}/api/${isPlaying ? "pause" : "play"}`, { method: "POST" });
   isPlaying = !isPlaying;
-  playIcon.innerHTML = isPlaying
-    ? `<path fill="currentColor" d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>`
-    : `<path fill="currentColor" d="M8 5v14l11-7z"/>`;
+  playPauseIcon.className = isPlaying ? "icon-pause" : "icon-play";
 };
 
 nextBtn.onclick = () => fetch(`${BACKEND}/api/next`, { method: "POST" });
@@ -66,12 +62,15 @@ volumeSlider.oninput = () => {
 setInterval(updateNowPlaying, 3000);
 updateNowPlaying();
 
-// Expand controls on tap or motion
-function expandControls() {
-  app.classList.add("expanded");
-  clearTimeout(idleTimeout);
-  idleTimeout = setTimeout(() => app.classList.remove("expanded"), 4000);
+// TAP TO OPEN/CLOSE CONTROLS
+function toggleControls() {
+  if (app.classList.contains("expanded")) {
+    app.classList.remove("expanded");
+    clearTimeout(idleTimeout);
+  } else {
+    app.classList.add("expanded");
+    idleTimeout = setTimeout(() => app.classList.remove("expanded"), 5000);
+  }
 }
 
-document.addEventListener("click", expandControls);
-window.addEventListener("devicemotion", expandControls);
+document.body.addEventListener("pointerdown", toggleControls);
