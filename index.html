@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MusaFrame</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div id="background"></div>
+
+  <div id="content">
+    <img id="albumArt" src="" alt="Album Art" />
+
+    <div id="trackInfo">
+      <h1 id="trackName">Loading...</h1>
+      <h2 id="artistName"></h2>
+    </div>
+
+    <div id="controls">
+      <button id="prevBtn">⏮</button>
+      <button id="playPauseBtn">⏯</button>
+      <button id="nextBtn">⏭</button>
+    </div>
+
+    <input type="range" id="volumeSlider" min="0" max="100" value="50" />
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
