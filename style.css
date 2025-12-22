@@ -1,0 +1,71 @@
+body {
+  margin: 0;
+  overflow: hidden;
+  font-family: Arial, sans-serif;
+  background: black;
+  color: white;
+}
+
+#background {
+  position: fixed;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  filter: blur(40px) brightness(0.4);
+  transform: scale(1.2);
+}
+
+#content {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding-top: 40px;
+}
+
+#albumArt {
+  width: 70vw;
+  max-width: 350px;
+  border-radius: 12px;
+  box-shadow: 0 0 40px rgba(0,0,0,0.6);
+}
+
+#trackInfo {
+  margin-top: 20px;
+}
+
+#trackName {
+  font-size: 2rem;
+  margin: 0;
+}
+
+#artistName {
+  font-size: 1.2rem;
+  opacity: 0.8;
+  margin: 5px 0 20px;
+}
+
+#controls {
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+  margin-top: 20px;
+}
+
+#controls button {
+  font-size: 2rem;
+  padding: 10px 20px;
+  border: none;
+  background: rgba(255,255,255,0.2);
+  color: white;
+  border-radius: 10px;
+  transition: background 0.2s;
+}
+
+#controls button:active {
+  background: rgba(255,255,255,0.4);
+}
+
+#volumeSlider {
+  width: 80%;
+  margin-top: 30px;
+}
