@@ -1,11 +1,8 @@
-import dotenv from "dotenv";
-dotenv.config();
-
-
 import express from "express";
 import fetch from "node-fetch";
 import dotenv from "dotenv";
 import crypto from "crypto";
+import fs from "fs";
 
 dotenv.config();
 
@@ -13,27 +10,32 @@ const app = express();
 app.use(express.json());
 
 // ===== ENV VARS =====
-const {
+let {
   SPOTIFY_CLIENT_ID,
   SPOTIFY_CLIENT_SECRET,
   SPOTIFY_REDIRECT_URI,
+  FRONTEND_URL,              // <-- Add this in Render
   SPOTIFY_REFRESH_TOKEN
 } = process.env;
+
+// ===== LOAD REFRESH TOKEN FROM FILE IF EXISTS =====
+if (fs.existsSync("refresh_token.txt")) {
+  SPOTIFY_REFRESH_TOKEN = fs.readFileSync("refresh_token.txt", "utf8").trim();
+  console.log("Loaded refresh token from file");
+}
 
 // ===== TOKEN CACHE =====
 let accessToken = null;
 let accessTokenExpiresAt = 0;
 
-// ===== HELPERS =====
+// ===== GET ACCESS TOKEN =====
 async function getAccessToken() {
   const now = Date.now();
 
-  // still valid?
   if (accessToken && now < accessTokenExpiresAt - 30000) {
     return accessToken;
   }
 
-  // refresh
   const creds = Buffer.from(
     `${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`
   ).toString("base64");
@@ -62,6 +64,7 @@ async function getAccessToken() {
   return accessToken;
 }
 
+// ===== SPOTIFY API WRAPPER =====
 async function spotifyApi(path, options = {}) {
   const token = await getAccessToken();
 
@@ -140,15 +143,15 @@ app.get("/callback", async (req, res) => {
     return res.status(400).send("Error during Spotify login");
   }
 
-  // IMPORTANT: You must copy this into Render env vars
-  const refreshToken = data.refresh_token;
+  // ===== SAVE REFRESH TOKEN AUTOMATICALLY =====
+  if (data.refresh_token) {
+    fs.writeFileSync("refresh_token.txt", data.refresh_token);
+    SPOTIFY_REFRESH_TOKEN = data.refresh_token;
+    console.log("Saved new refresh token");
+  }
 
-  res.send(`
-    <h2>Login successful!</h2>
-    <p>Copy this refresh token and paste it into Render:</p>
-    <pre>${refreshToken}</pre>
-    <p>Then redeploy your service.</p>
-  `);
+  // ===== REDIRECT BACK TO FRONTEND =====
+  res.redirect(FRONTEND_URL || "/");
 });
 
 // ===== API ENDPOINTS =====
