@@ -42,7 +42,7 @@ async function updateNowPlaying() {
   }
 }
 
-// Controls
+// Controls (main)
 playPauseBtn.onclick = () => {
   fetch(`${BACKEND}/api/${isPlaying ? "pause" : "play"}`, { method: "POST" });
   isPlaying = !isPlaying;
