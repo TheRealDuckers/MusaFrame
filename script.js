@@ -30,10 +30,12 @@ async function updateNowPlaying() {
     trackTitle.textContent = track.name;
     trackMeta.textContent = artists;
 
-  const artUrl = track.album.images[0].url;
-  albumArt.src = artUrl;
-  bg.style.backgroundImage = `url(${artUrl})`;
+    const artUrl = track.album.images[0].url;
+    albumArt.src = artUrl;
+    bg.style.backgroundImage = `url(${artUrl})`;
 
+    isPlaying = data.is_playing;
+    playPauseIcon.className = isPlaying ? "icon-pause" : "icon-play";
 
   } catch (err) {
     console.error("Error updating now playing:", err);
@@ -95,4 +97,3 @@ async function checkLogin() {
 }
 
 window.addEventListener("load", checkLogin);
-
