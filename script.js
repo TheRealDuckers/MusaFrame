@@ -166,3 +166,12 @@ document.addEventListener("pointerleave", () => clearTimeout(holdTimer));
 
 // Tap album art → toggle fullscreen
 albumArt.addEventListener("click", toggleFullscreen);
+
+const params = new URLSearchParams(location.search);
+const token = params.get("token");
+
+if (token) {
+  localStorage.setItem("deviceToken", token);
+  history.replaceState({}, "", "/MusaFrame/"); // clean URL
+}
+
