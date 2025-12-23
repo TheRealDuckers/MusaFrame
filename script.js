@@ -1,5 +1,14 @@
 const BACKEND = "https://musaframe.onrender.com";
 
+// Read device token (must exist or user is blocked)
+const DEVICE_TOKEN = localStorage.getItem("deviceToken");
+
+// If no token → block immediately
+if (!DEVICE_TOKEN) {
+  document.body.innerHTML = "Not authorized.";
+  throw new Error("No device token");
+}
+
 const app = document.getElementById("app");
 const bg = document.getElementById("bg");
 
@@ -16,13 +25,29 @@ const volumeSlider = document.getElementById("volumeSlider");
 let isPlaying = false;
 let idleTimeout;
 
+const fallbackArt = "favicon.png";
+
+// Helper for secure POST requests
+function post(url) {
+  return fetch(url, {
+    method: "POST",
+    headers: {
+      "x-device-token": DEVICE_TOKEN
+    }
+  });
+}
+
 // Fetch now playing
 async function updateNowPlaying() {
   try {
     const res = await fetch(`${BACKEND}/api/current`);
     const data = await res.json();
 
-    if (!data || !data.item) return;
+    // If backend says "not logged in" → redirect
+    if (!data || !data.item) {
+      window.location.href = `${BACKEND}/login`;
+      return;
+    }
 
     const track = data.item;
     const artists = track.artists.map(a => a.name).join(", ");
@@ -30,7 +55,17 @@ async function updateNowPlaying() {
     trackTitle.textContent = track.name;
     trackMeta.textContent = artists;
 
-    const artUrl = track.album.images[0].url;
+    // Safe fallback album art
+    let artUrl = fallbackArt;
+    if (
+      track &&
+      track.album &&
+      Array.isArray(track.album.images) &&
+      track.album.images.length > 0
+    ) {
+      artUrl = track.album.images[0].url;
+    }
+
     albumArt.src = artUrl;
     bg.style.backgroundImage = `url(${artUrl})`;
 
@@ -42,20 +77,18 @@ async function updateNowPlaying() {
   }
 }
 
-// Controls (main)
+// Controls (secure)
 playPauseBtn.onclick = () => {
-  fetch(`${BACKEND}/api/${isPlaying ? "pause" : "play"}`, { method: "POST" });
+  post(`${BACKEND}/api/${isPlaying ? "pause" : "play"}`);
   isPlaying = !isPlaying;
   playPauseIcon.className = isPlaying ? "icon-pause" : "icon-play";
 };
 
-nextBtn.onclick = () => fetch(`${BACKEND}/api/next`, { method: "POST" });
-prevBtn.onclick = () => fetch(`${BACKEND}/api/previous`, { method: "POST" });
+nextBtn.onclick = () => post(`${BACKEND}/api/next`);
+prevBtn.onclick = () => post(`${BACKEND}/api/previous`);
 
 volumeSlider.oninput = () => {
-  fetch(`${BACKEND}/api/volume?percent=${volumeSlider.value}`, {
-    method: "POST"
-  });
+  post(`${BACKEND}/api/volume?percent=${volumeSlider.value}`);
 };
 
 // Auto-update every 3 seconds
@@ -75,13 +108,12 @@ function toggleControls() {
 
 document.body.addEventListener("pointerdown", toggleControls);
 
-
+// LOGIN CHECK
 async function checkLogin() {
   try {
     const res = await fetch(`${BACKEND}/api/current`);
     const data = await res.json();
 
-    // If no track + no item = not logged in
     if (!data || !data.item) {
       window.location.href = `${BACKEND}/login`;
       return false;
@@ -90,10 +122,45 @@ async function checkLogin() {
     return true;
 
   } catch (err) {
-    // If the API fails, assume not logged in
     window.location.href = `${BACKEND}/login`;
     return false;
   }
 }
 
 window.addEventListener("load", checkLogin);
+
+// FULLSCREEN HELPERS
+function enterFullscreen() {
+  const el = document.documentElement;
+  if (!document.fullscreenElement) {
+    if (el.requestFullscreen) el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    else if (el.msRequestFullscreen) el.msRequestFullscreen();
+  }
+}
+
+function exitFullscreen() {
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
+  }
+}
+
+function toggleFullscreen() {
+  if (document.fullscreenElement) exitFullscreen();
+  else enterFullscreen();
+}
+
+// Long-press anywhere (2 seconds) → fullscreen
+let holdTimer;
+
+document.addEventListener("pointerdown", () => {
+  holdTimer = setTimeout(() => {
+    toggleFullscreen();
+  }, 2000);
+});
+
+document.addEventListener("pointerup", () => clearTimeout(holdTimer));
+document.addEventListener("pointerleave", () => clearTimeout(holdTimer));
+
+// Tap album art → toggle fullscreen
+albumArt.addEventListener("click", toggleFullscreen);
