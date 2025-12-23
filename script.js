@@ -74,3 +74,27 @@ function toggleControls() {
 }
 
 document.body.addEventListener("pointerdown", toggleControls);
+
+
+async function checkLogin() {
+  try {
+    const res = await fetch(`${BACKEND}/api/current`);
+    const data = await res.json();
+
+    // If no track + no item = not logged in
+    if (!data || !data.item) {
+      window.location.href = `${BACKEND}/login`;
+      return false;
+    }
+
+    return true;
+
+  } catch (err) {
+    // If the API fails, assume not logged in
+    window.location.href = `${BACKEND}/login`;
+    return false;
+  }
+}
+
+window.addEventListener("load", checkLogin);
+
