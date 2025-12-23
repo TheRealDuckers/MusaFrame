@@ -1,226 +1,190 @@
-import express from "express";
-import fetch from "node-fetch";
-import dotenv from "dotenv";
-import crypto from "crypto";
-import fs from "fs";
-
-dotenv.config();
+require("dotenv").config();
+const express = require("express");
+const axios = require("axios");
+const cors = require("cors");
+const qs = require("qs");
+const crypto = require("crypto");
 
 const app = express();
+app.use(cors());
 app.use(express.json());
 
-// ===== ENV VARS =====
-let {
+const {
   SPOTIFY_CLIENT_ID,
   SPOTIFY_CLIENT_SECRET,
-  SPOTIFY_REDIRECT_URI,
-  FRONTEND_URL,              // <-- Add this in Render
-  SPOTIFY_REFRESH_TOKEN
+  SPOTIFY_REDIRECT_URI
 } = process.env;
 
-// ===== LOAD REFRESH TOKEN FROM FILE IF EXISTS =====
-if (fs.existsSync("refresh_token.txt")) {
-  SPOTIFY_REFRESH_TOKEN = fs.readFileSync("refresh_token.txt", "utf8").trim();
-  console.log("Loaded refresh token from file");
+let accessToken = null;
+let refreshToken = null;
+let deviceToken = null; // Only the paired device gets this
+
+// Helper: Spotify API request with auto-refresh
+async function spotifyRequest(method, url, data = {}) {
+  try {
+    const res = await axios({
+      method,
+      url,
+      headers: { Authorization: `Bearer ${accessToken}` },
+      data
+    });
+    return res.data;
+  } catch (err) {
+    if (err.response && err.response.status === 401) {
+      await refreshAccessToken();
+      const retry = await axios({
+        method,
+        url,
+        headers: { Authorization: `Bearer ${accessToken}` },
+        data
+      });
+      return retry.data;
+    }
+    throw err;
+  }
 }
 
-// ===== TOKEN CACHE =====
-let accessToken = null;
-let accessTokenExpiresAt = 0;
+// Refresh token
+async function refreshAccessToken() {
+  const body = qs.stringify({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken
+  });
 
-// ===== GET ACCESS TOKEN =====
-async function getAccessToken() {
-  const now = Date.now();
-
-  if (accessToken && now < accessTokenExpiresAt - 30000) {
-    return accessToken;
-  }
-
-  const creds = Buffer.from(
+  const auth = Buffer.from(
     `${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`
   ).toString("base64");
 
-  const res = await fetch("https://accounts.spotify.com/api/token", {
-    method: "POST",
-    headers: {
-      "Authorization": `Basic ${creds}`,
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: SPOTIFY_REFRESH_TOKEN
-    })
-  });
+  const res = await axios.post(
+    "https://accounts.spotify.com/api/token",
+    body,
+    {
+      headers: {
+        Authorization: `Basic ${auth}`,
+        "Content-Type": "application/x-www-form-urlencoded"
+      }
+    }
+  );
 
-  if (!res.ok) {
-    console.error("Failed to refresh token:", await res.text());
-    throw new Error("Token refresh failed");
-  }
-
-  const data = await res.json();
-  accessToken = data.access_token;
-  accessTokenExpiresAt = Date.now() + data.expires_in * 1000;
-
-  return accessToken;
+  accessToken = res.data.access_token;
+  console.log("🔄 Access token refreshed");
 }
 
-// ===== SPOTIFY API WRAPPER =====
-async function spotifyApi(path, options = {}) {
-  const token = await getAccessToken();
-
-  const res = await fetch(`https://api.spotify.com/v1${path}`, {
-    method: options.method || "GET",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-      "Content-Type": "application/json"
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined
-  });
-
-  if (!res.ok && res.status !== 204) {
-    console.error("Spotify API error", res.status, await res.text());
-    throw new Error("Spotify API error");
-  }
-
-  if (res.status === 204) return null;
-  return await res.json();
-}
-
-// ===== CORS =====
-app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  if (req.method === "OPTIONS") return res.sendStatus(204);
-  next();
-});
-
-// ===== LOGIN =====
+// Login route
 app.get("/login", (req, res) => {
-  const state = crypto.randomBytes(16).toString("hex");
-
   const scope = [
     "user-read-playback-state",
     "user-modify-playback-state",
     "user-read-currently-playing"
   ].join(" ");
 
-  const params = new URLSearchParams({
+  const params = qs.stringify({
     response_type: "code",
     client_id: SPOTIFY_CLIENT_ID,
     scope,
-    redirect_uri: SPOTIFY_REDIRECT_URI,
-    state
+    redirect_uri: SPOTIFY_REDIRECT_URI
   });
 
-  res.redirect("https://accounts.spotify.com/authorize?" + params.toString());
+  res.redirect(`https://accounts.spotify.com/authorize?${params}`);
 });
 
-// ===== CALLBACK =====
+// Callback route
 app.get("/callback", async (req, res) => {
-  const code = req.query.code || null;
+  const code = req.query.code;
 
-  const creds = Buffer.from(
+  const body = qs.stringify({
+    grant_type: "authorization_code",
+    code,
+    redirect_uri: SPOTIFY_REDIRECT_URI
+  });
+
+  const auth = Buffer.from(
     `${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`
   ).toString("base64");
 
-  const tokenRes = await fetch("https://accounts.spotify.com/api/token", {
-    method: "POST",
-    headers: {
-      "Authorization": `Basic ${creds}`,
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: new URLSearchParams({
-      code,
-      redirect_uri: SPOTIFY_REDIRECT_URI,
-      grant_type: "authorization_code"
-    })
-  });
+  const tokenRes = await axios.post(
+    "https://accounts.spotify.com/api/token",
+    body,
+    {
+      headers: {
+        Authorization: `Basic ${auth}`,
+        "Content-Type": "application/x-www-form-urlencoded"
+      }
+    }
+  );
 
-  const data = await tokenRes.json();
+  accessToken = tokenRes.data.access_token;
+  refreshToken = tokenRes.data.refresh_token;
 
-  if (data.error) {
-    return res.status(400).send("Error during Spotify login");
-  }
+  // Generate a device token tied to THIS login
+  deviceToken = crypto.randomBytes(32).toString("hex");
+  console.log("🔐 Device paired:", deviceToken);
 
-  // ===== SAVE REFRESH TOKEN AUTOMATICALLY =====
-  if (data.refresh_token) {
-    fs.writeFileSync("refresh_token.txt", data.refresh_token);
-    SPOTIFY_REFRESH_TOKEN = data.refresh_token;
-    console.log("Saved new refresh token");
-  }
-
-  // ===== REDIRECT BACK TO FRONTEND =====
-  res.redirect(FRONTEND_URL || "/");
+  // Send token to the browser ONCE
+  res.send(`
+    <script>
+      localStorage.setItem("deviceToken", "${deviceToken}");
+      document.body.innerHTML = "Device paired successfully. You can close this tab.";
+    </script>
+  `);
 });
 
-// ===== API ENDPOINTS =====
+// Middleware: only the paired device can control playback
+function checkDeviceToken(req, res, next) {
+  const token = req.headers["x-device-token"];
+  if (!token || token !== deviceToken) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+  next();
+}
 
-// Now playing
+// Get current track
 app.get("/api/current", async (req, res) => {
   try {
-    const data = await spotifyApi("/me/player/currently-playing");
-    res.json(data || {});
-  } catch (e) {
-    res.status(500).send("Error");
+    if (!accessToken) return res.json({ item: null });
+
+    const data = await spotifyRequest(
+      "get",
+      "https://api.spotify.com/v1/me/player/currently-playing"
+    );
+
+    res.json(data || { item: null });
+  } catch (err) {
+    res.json({ item: null });
   }
 });
 
-// Play
-app.post("/api/play", async (req, res) => {
-  try {
-    await spotifyApi("/me/player/play", { method: "PUT" });
-    res.sendStatus(204);
-  } catch (e) {
-    res.status(500).send("Error");
-  }
+// Playback controls
+app.post("/api/play", checkDeviceToken, async (req, res) => {
+  await spotifyRequest("put", "https://api.spotify.com/v1/me/player/play");
+  res.json({ ok: true });
 });
 
-// Pause
-app.post("/api/pause", async (req, res) => {
-  try {
-    await spotifyApi("/me/player/pause", { method: "PUT" });
-    res.sendStatus(204);
-  } catch (e) {
-    res.status(500).send("Error");
-  }
+app.post("/api/pause", checkDeviceToken, async (req, res) => {
+  await spotifyRequest("put", "https://api.spotify.com/v1/me/player/pause");
+  res.json({ ok: true });
 });
 
-// Next
-app.post("/api/next", async (req, res) => {
-  try {
-    await spotifyApi("/me/player/next", { method: "POST" });
-    res.sendStatus(204);
-  } catch (e) {
-    res.status(500).send("Error");
-  }
+app.post("/api/next", checkDeviceToken, async (req, res) => {
+  await spotifyRequest("post", "https://api.spotify.com/v1/me/player/next");
+  res.json({ ok: true });
 });
 
-// Previous
-app.post("/api/previous", async (req, res) => {
-  try {
-    await spotifyApi("/me/player/previous", { method: "POST" });
-    res.sendStatus(204);
-  } catch (e) {
-    res.status(500).send("Error");
-  }
+app.post("/api/previous", checkDeviceToken, async (req, res) => {
+  await spotifyRequest("post", "https://api.spotify.com/v1/me/player/previous");
+  res.json({ ok: true });
 });
 
 // Volume
-app.post("/api/volume", async (req, res) => {
-  const percent = Number(req.query.percent ?? req.body?.percent ?? 50);
-  try {
-    await spotifyApi(`/me/player/volume?volume_percent=${percent}`, {
-      method: "PUT"
-    });
-    res.sendStatus(204);
-  } catch (e) {
-    res.status(500).send("Error");
-  }
+app.post("/api/volume", checkDeviceToken, async (req, res) => {
+  const percent = req.query.percent || 50;
+  await spotifyRequest(
+    "put",
+    `https://api.spotify.com/v1/me/player/volume?volume_percent=${percent}`
+  );
+  res.json({ ok: true });
 });
 
-// ===== START SERVER =====
+// Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log("Server running on port", PORT);
-});
+app.listen(PORT, () => console.log(`🚀 MusaFrame backend running on ${PORT}`));
