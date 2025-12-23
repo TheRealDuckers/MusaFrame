@@ -30,10 +30,7 @@ async function updateNowPlaying() {
     trackTitle.textContent = track.name;
     trackMeta.textContent = artists;
 
-    const artUrl = track.album.images[0].url;
-    albumArt.src = artUrl;
-    bg.style.backgroundImage = `url(${artUrl})`;
-
+   const fallbackArt = "favicon.png"; // put this file in your frontend folder const artUrl = track?.album?.images?.[0]?.url || fallbackArt; albumArt.src = artUrl; bg.style.backgroundImage = `url(${artUrl})`;
     isPlaying = data.is_playing;
     playPauseIcon.className = isPlaying ? "icon-pause" : "icon-play";
 
