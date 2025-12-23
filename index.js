@@ -19,7 +19,7 @@ let accessToken = null;
 let refreshToken = null;
 let deviceToken = null; // Only the paired device gets this
 
-// Helper: Spotify API request with auto-refresh
+// Helper: Spotify API request with auto-refresh !
 async function spotifyRequest(method, url, data = {}) {
   try {
     const res = await axios({
