@@ -1,3 +1,12 @@
+const params = new URLSearchParams(location.search);
+const token = params.get("token");
+
+if (token) {
+  localStorage.setItem("deviceToken", token);
+  history.replaceState({}, "", "/MusaFrame/");
+}
+
+
 const BACKEND = "https://musaframe.onrender.com";
 
 // Read device token (must exist or user is blocked)
