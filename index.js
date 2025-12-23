@@ -1,9 +1,11 @@
-require("dotenv").config();
-const express = require("express");
-const axios = require("axios");
-const cors = require("cors");
-const qs = require("qs");
-const crypto = require("crypto");
+import dotenv from "dotenv";
+dotenv.config();
+
+import express from "express";
+import axios from "axios";
+import cors from "cors";
+import qs from "qs";
+import crypto from "crypto";
 
 const app = express();
 app.use(cors());
@@ -19,7 +21,7 @@ let accessToken = null;
 let refreshToken = null;
 let deviceToken = null; // Only the paired device gets this
 
-// Helper: Spotify API request with auto-refresh !
+// Helper: Spotify API request with auto-refresh
 async function spotifyRequest(method, url, data = {}) {
   try {
     const res = await axios({
@@ -88,6 +90,7 @@ app.get("/login", (req, res) => {
   res.redirect(`https://accounts.spotify.com/authorize?${params}`);
 });
 
+// Callback route
 app.get("/callback", async (req, res) => {
   const code = req.query.code;
 
@@ -112,7 +115,6 @@ app.get("/callback", async (req, res) => {
     }
   );
 
-  
   accessToken = tokenRes.data.access_token;
   refreshToken = tokenRes.data.refresh_token;
 
@@ -120,13 +122,8 @@ app.get("/callback", async (req, res) => {
   deviceToken = crypto.randomBytes(32).toString("hex");
   console.log("🔐 Device paired:", deviceToken);
 
-  // Send token to the browser ONCE
-  res.send(`
-    <script>
-      localStorage.setItem("deviceToken", "${deviceToken}");
-      document.body.innerHTML = "Device paired successfully. You can close this tab.";
-    </script>
-  `);
+  // Redirect token to the frontend domain
+  res.redirect(`https://therealduckers.github.io/MusaFrame/?token=${deviceToken}`);
 });
 
 // Middleware: only the paired device can control playback
