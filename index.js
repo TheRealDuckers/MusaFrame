@@ -88,7 +88,6 @@ app.get("/login", (req, res) => {
   res.redirect(`https://accounts.spotify.com/authorize?${params}`);
 });
 
-// Callback route
 app.get("/callback", async (req, res) => {
   const code = req.query.code;
 
@@ -113,6 +112,7 @@ app.get("/callback", async (req, res) => {
     }
   );
 
+  
   accessToken = tokenRes.data.access_token;
   refreshToken = tokenRes.data.refresh_token;
 
