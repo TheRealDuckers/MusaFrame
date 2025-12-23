@@ -91,6 +91,8 @@ volumeSlider.oninput = () => {
   post(`${BACKEND}/api/volume?percent=${volumeSlider.value}`);
 };
 
+enterFullscreen()
+
 // Auto-update every 3 seconds
 setInterval(updateNowPlaying, 3000);
 updateNowPlaying();
