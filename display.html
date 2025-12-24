@@ -294,6 +294,12 @@ function closeFullscreen() {
     document.msExitFullscreen();
   }
 }
+
+
+  document.addEventListener("DOMContentLoaded", (event) => {
+console.log("DOM fully loaded and parsed");
+    openFullscreen();
+});
 </script>
 </body>
 </html>
