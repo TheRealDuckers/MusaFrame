@@ -161,14 +161,6 @@ function toggleFullscreen() {
   else enterFullscreen();
 }
 
-// Long-press anywhere (2 seconds) → fullscreen
-let holdTimer;
-
-document.addEventListener("pointerdown", () => {
-  holdTimer = setTimeout(() => {
-    toggleFullscreen();
-  }, 2000);
-});
 
 document.addEventListener("pointerup", () => clearTimeout(holdTimer));
 document.addEventListener("pointerleave", () => clearTimeout(holdTimer));
