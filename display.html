@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Now Playing</title>
+
+<style>
+:root {
+  --accent: #1db954;
+  --text: #ffffff;
+  --text-dim: #b3b3b3;
+  --panel-bg: rgba(0,0,0,0.45);
+  --blur: 18px;
+  --transition-main: 360ms cubic-bezier(0.25,0.1,0.25,1);
+  --transition-fast: 180ms ease-out;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: #000;
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--text);
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  background: #000;
+}
+
+/* TWO BACKGROUND LAYERS FOR CROSSFADE */
+.bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: blur(40px);
+  transform: scale(1.1);
+  opacity: 0;
+  transition: opacity 0.8s ease;
+  z-index: 0;
+}
+
+.bg-a { opacity: 1; }
+.bg-b { opacity: 0; }
+
+.vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at center, transparent 45%, rgba(0,0,0,0.85) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.content {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-main);
+}
+
+/* Controls panel */
+.controls {
+  height: 100%;
+  width: 0;
+  opacity: 0;
+  padding: 40px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  background: var(--panel-bg);
+  backdrop-filter: blur(var(--blur));
+  -webkit-backdrop-filter: blur(var(--blur));
+  overflow: hidden;
+  transition:
+    width var(--transition-main),
+    opacity var(--transition-main),
+    padding var(--transition-main);
+}
+
+.app.expanded .controls {
+  width: 38%;
+  opacity: 1;
+}
+
+.controls-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.track-title {
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-meta {
+  font-size: 0.88rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Album area */
+.album {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-main);
+  padding: 32px;
+}
+
+.album-art {
+  width: min(70vh, 70vw);
+  height: min(70vh, 70vw);
+  border-radius: 24px;
+  object-fit: cover;
+  box-shadow:
+    0 24px 60px rgba(0,0,0,0.7),
+    0 0 0 1px rgba(255,255,255,0.04);
+  transition:
+    transform 900ms cubic-bezier(0.19,1,0.22,1),
+    box-shadow var(--transition-main),
+    filter var(--transition-main);
+  transform-origin: center;
+}
+
+.app.expanded .album-art {
+  transform: scale(0.95);
+}
+
+@media (max-width: 900px) {
+  .controls { padding: 28px 22px; }
+  .album { padding: 24px; }
+}
+
+@media (max-width: 700px) {
+  .content { flex-direction: column-reverse; }
+  .app.expanded .controls {
+    width: 100%;
+    height: 42%;
+  }
+  .album { height: 58%; }
+  .album-art {
+    width: min(60vh, 80vw);
+    height: auto;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="app" id="app">
+
+  <!-- TWO BACKGROUND LAYERS -->
+  <div class="bg bg-a" id="bgA"></div>
+  <div class="bg bg-b" id="bgB"></div>
+
+  <div class="vignette"></div>
+
+  <div class="content">
+
+    <!-- LEFT PANEL -->
+    <div class="controls">
+      <div class="controls-header">
+        <div class="track-title" id="trackTitle">—</div>
+        <div class="track-meta" id="trackArtist">—</div>
+      </div>
+    </div>
+
+    <!-- ALBUM ART -->
+    <div class="album">
+      <img id="albumArt" class="album-art" src="" alt="Album Art" />
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* CHANGE THIS */
+const API_URL = "https://musaframe.onrender.com/api/current";
+
+const app = document.getElementById("app");
+const albumArt = document.getElementById("albumArt");
+const trackTitle = document.getElementById("trackTitle");
+const trackArtist = document.getElementById("trackArtist");
+
+const bgA = document.getElementById("bgA");
+const bgB = document.getElementById("bgB");
+let activeBg = "a";
+
+/* TAP ANYWHERE TO TOGGLE PANEL */
+document.body.addEventListener("click", () => {
+  app.classList.toggle("expanded");
+});
+
+/* CROSSFADE BACKGROUND */
+function fadeBackgroundTo(url) {
+  const incoming = activeBg === "a" ? bgB : bgA;
+  const outgoing = activeBg === "a" ? bgA : bgB;
+
+  incoming.style.backgroundImage = `url("${url}")`;
+
+  incoming.style.opacity = 1;
+  outgoing.style.opacity = 0;
+
+  activeBg = activeBg === "a" ? "b" : "a";
+}
+
+/* FETCH SPOTIFY DATA */
+async function loadTrack() {
+  try {
+    const res = await fetch(API_URL, { cache: "no-store" });
+    if (!res.ok) return;
+
+    const data = await res.json();
+    if (!data || !data.item) return;
+
+    const track = data.item;
+
+    trackTitle.textContent = track.name || "Unknown track";
+    trackArtist.textContent =
+      (track.artists && track.artists.map(a => a.name).join(", ")) || "Unknown artist";
+
+    const images = track.album && track.album.images ? track.album.images : [];
+    const mainImage = images[0] ? images[0].url : "";
+
+    if (mainImage) {
+      albumArt.src = mainImage;
+      fadeBackgroundTo(mainImage);
+    }
+
+  } catch (err) {
+    console.error("Error loading track", err);
+  }
+}
+
+loadTrack();
+setInterval(loadTrack, 10000);
+</script>
+
+</body>
+</html>
