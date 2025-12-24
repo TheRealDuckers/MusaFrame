@@ -1,4 +1,4 @@
-
+let holdTimer;
 let isFullscreen = false;
 
 function enterFullscreen() {
