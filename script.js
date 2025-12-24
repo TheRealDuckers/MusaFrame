@@ -12,11 +12,13 @@ const BACKEND = "https://musaframe.onrender.com";
 // Read device token (must exist or user is blocked)
 const DEVICE_TOKEN = localStorage.getItem("deviceToken");
 
+document.addEventListener("DOMContentLoaded", () => {
 // If no token → block immediately
 if (!DEVICE_TOKEN) {
   document.body.innerHTML = "Not authorized.";
   throw new Error("No device token");
 }
+});
 
 const app = document.getElementById("app");
 const bg = document.getElementById("bg");
